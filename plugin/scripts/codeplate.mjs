@@ -2,7 +2,7 @@
 // CodePlate for coding agents: browse the catalog, fetch a template, check a project.
 // Node 18+ built-ins only, so it runs the same on Windows, macOS and Linux.
 //
-//   node codeplate.mjs list [words...] [--tier free|pro] [--kind game|app] [--stack godot] [--json]
+//   node codeplate.mjs list [words...] [--tier free|pro] [--kind game|app|document] [--stack godot] [--json]
 //   node codeplate.mjs show <id> [--json]
 //   node codeplate.mjs get <id>          [--dir <parent>] [--name <folder>]   free templates
 //   node codeplate.mjs get --url <link>  [--dir <parent>] [--name <folder>]   a download link from codeplate.io
@@ -21,7 +21,7 @@ import { extractTemplateZip, ZipError } from './lib/unzip.mjs';
 import { describeProject, findProjectRoot, readManifest, requirements, runChecks, FREE_CREDIT } from './lib/project.mjs';
 
 const USAGE = `usage: codeplate <command> [options]
-  list [words...] [--tier free|pro] [--kind game|app] [--stack <name>] [--json]
+  list [words...] [--tier free|pro] [--kind game|app|document] [--stack <name>] [--json]
   show <id> [--json]
   get <id> | --url <link> | --zip <file>  [--dir <parent>] [--name <folder>]
   status [dir] [--json]

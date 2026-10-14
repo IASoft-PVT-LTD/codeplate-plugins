@@ -32,7 +32,7 @@ Add `--json` to `list`, `show` and `status` when you want to parse the result.
 
 ## How to handle a request
 
-1. **No arguments or "what do you have?"**: run `codeplate list` and summarize it for the user grouped by kind (games, apps), marking Free and Pro. Don't paste the raw table.
+1. **No arguments or "what do you have?"**: run `codeplate list` and summarize it for the user grouped by kind (games, apps, documents), marking Free and Pro. Don't paste the raw table.
 2. **Picking a template**: match the user's idea to the catalog with `list <words>` and `show <id>`. Recommend one or two, say why, and say whether it's Free or which paid plan includes it (Creator, Plus or Max; `show` names it). Free templates need the credit "Built with CodePlate (codeplate.io)" in what they ship. Pro templates need an active CodePlate plan that includes them (that plan or a higher one) and no credit.
 3. **Fetching**: confirm the folder with the user first (default: a new folder named after the template inside the current directory). `get` refuses a folder that already has files in it; never delete anything to make room.
    - **Free:** `codeplate get <id>`. The script checks the zip's SHA-256 against the catalog.

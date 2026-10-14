@@ -455,12 +455,18 @@ describe('plugin layout', () => {
     }
   });
 
-  test('plugin files are UTF-8 without a BOM', () => {
+  test('plugin files are UTF-8 without a BOM (the icon aside)', () => {
     const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? (e.name === 'results' ? [] : walk(join(d, e.name))) : [join(d, e.name)]));
-    for (const f of walk(PLUGIN)) {
+    for (const f of walk(PLUGIN).filter((f) => !f.endsWith('.png'))) {
       const b = readFileSync(f);
       assert.ok(!(b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf), `${f} has a BOM`);
       assert.doesNotThrow(() => new TextDecoder('utf-8', { fatal: true }).decode(b), f);
     }
+  });
+
+  test('the icon in plugin.json is a PNG inside the plugin', () => {
+    const icon = JSON.parse(readFileSync(join(PLUGIN, '.claude-plugin', 'plugin.json'), 'utf8')).icon;
+    assert.equal(icon, './logo.png');
+    assert.deepEqual([...readFileSync(join(PLUGIN, icon)).subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47]);
   });
 });
