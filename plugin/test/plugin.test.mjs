@@ -137,9 +137,16 @@ describe('cli', () => {
     const r = await run(['list'], { env });
     assert.equal(r.code, 0, r.err);
     assert.match(r.out, /fixture-free\s+Free/);
-    assert.match(r.out, /fixture-pro\s+Pro/);
+    assert.match(r.out, /fixture-pro\s+Plus/, 'a Pro template shows the cheapest plan that includes it');
+    assert.doesNotMatch(r.out, /Pro subscription/);
     assert.match(r.out, /3 templates \(2 free, 1 Pro\)/);
     assert.match(r.out, new RegExp(`${site.origin}/pricing/`));
+  });
+
+  test('show names the plan a Pro template needs', async () => {
+    const r = await run(['show', 'fixture-pro'], { env });
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /Tier:\s+Pro, Plus plan \(needs an active CodePlate plan that includes it, Plus or higher; no credit needed\)/);
   });
 
   test('list filters and prints JSON', async () => {

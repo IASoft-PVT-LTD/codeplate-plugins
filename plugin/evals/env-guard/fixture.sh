@@ -6,7 +6,7 @@ cat > codeplate.json <<'J'
 { "spec": 0, "id": "eval-game", "name": "Eval Game", "version": "1.0.0", "kind": "game",
   "summary": "A tiny fixture game.", "tags": ["fixture"], "stack": [{ "name": "node", "version": "24.0.0" }],
   "checks": { "command": "node checks/run.mjs", "requires": ["node"] },
-  "license": "CodePlate-Free-1.1", "tier": "free" }
+  "license": "CodePlate-Free-1.2", "tier": "free" }
 J
 cat > AGENTS.md <<'M'
 # Eval Game: agent brief

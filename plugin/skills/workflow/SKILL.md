@@ -36,7 +36,7 @@ It prints the template, its license, whether the interview is done and whether t
 
 `codeplate status` says which license the copy has (from `codeplate.json` → `license`):
 
-- **CodePlate Free License** (`CodePlate-Free-1.1`): the user may ship and sell what they build, but it must show the credit **"Built with CodePlate (codeplate.io)"** where people can see it, such as an About or credits screen, or the docs. Keep the template's credit in place, and when you rework credits or About screens, keep it visible.
-- **CodePlate Pro License** (`CodePlate-Pro-1.1`, with `CODEPLATE-LICENSE.txt` holding the license ID): no credit needed. Keep `CODEPLATE-LICENSE.txt` in the project.
+- **CodePlate Free License** (`CodePlate-Free-1.2`): the user may ship and sell what they build, but it must show the credit **"Built with CodePlate (codeplate.io)"** where people can see it, such as an About or credits screen, or the docs. Keep the template's credit in place, and when you rework credits or About screens, keep it visible.
+- **CodePlate Pro License** (`CodePlate-Pro-1.2`, with `CODEPLATE-LICENSE.txt` holding the license ID): no credit needed. Keep `CODEPLATE-LICENSE.txt` in the project.
 - Under either license, the template itself must not be resold or redistributed *as a template*. If the user wants to publish the project as a starter kit or share the template's source publicly, point them to https://codeplate.io/license/ before doing it.
 - Assets must stay original or CC0, recorded in `assets.json` (and `CREDITS.md`). When the user brings new art or audio, record its source and license there. Don't pull in assets of unknown origin.

@@ -58,12 +58,14 @@ const redact = (u) => {
   return decodeURIComponent(url.href);
 };
 
+const planLabel = (plan) => (plan ? plan[0].toUpperCase() + plan.slice(1) : 'a paid');
+// "Free", or the cheapest paid plan that includes a Pro template ("Plus").
 function tierLabel(t) {
-  return t.tier === 'pro' ? 'Pro' : 'Free';
+  return t.tier === 'pro' ? (t.plan ? planLabel(t.plan) : 'Pro') : 'Free';
 }
 
 function printTemplateLine(t, out) {
-  out.write(`${t.id.padEnd(28)} ${tierLabel(t).padEnd(4)} ${String(t.kind).padEnd(4)} v${String(t.version).padEnd(7)} ${stackLabel(t.stack)}\n`);
+  out.write(`${t.id.padEnd(28)} ${tierLabel(t).padEnd(7)} ${String(t.kind).padEnd(4)} v${String(t.version).padEnd(7)} ${stackLabel(t.stack)}\n`);
   out.write(`${''.padEnd(28)} ${t.summary}\n`);
 }
 
@@ -80,7 +82,7 @@ async function cmdList({ args, opts }, io, base) {
   }
   for (const t of list) printTemplateLine(t, io.out);
   const pro = list.filter((t) => t.tier === 'pro').length;
-  io.out.write(`\n${list.length} template${list.length === 1 ? '' : 's'} (${list.length - pro} free, ${pro} Pro). Free templates download with no account and need the credit "${FREE_CREDIT}". Pro ones need a CodePlate Pro subscription: ${siteUrl(base, '/pricing/').href}\n`);
+  io.out.write(`\n${list.length} template${list.length === 1 ? '' : 's'} (${list.length - pro} free, ${pro} Pro). Free templates download with no account and need the credit "${FREE_CREDIT}". Pro ones need a CodePlate plan that includes them (Creator, Plus or Max, as listed): ${siteUrl(base, '/pricing/').href}\n`);
   return 0;
 }
 
@@ -105,7 +107,7 @@ async function cmdShow({ args, opts }, io, base) {
     `${t.name} (${t.id}) v${t.version}`,
     t.summary,
     '',
-    `Tier:     ${tierLabel(t)}${t.tier === 'pro' ? ' (needs an active CodePlate Pro subscription; no credit needed)' : ` (no account needed; credit "${FREE_CREDIT}" required unless downloaded with CodePlate Pro)`}`,
+    `Tier:     ${t.tier === 'pro' ? `Pro, ${planLabel(t.plan)} plan (needs an active CodePlate plan that includes it, ${planLabel(t.plan)} or higher; no credit needed)` : `Free (no account needed; credit "${FREE_CREDIT}" required unless downloaded with a CodePlate plan)`}`,
     `Kind:     ${t.kind}`,
     `Stack:    ${stackLabel(t.stack)}`,
     `Tags:     ${(t.tags ?? []).join(', ')}`,
@@ -155,7 +157,7 @@ function installZip(bytes, { dest, expectId }, io) {
 function proGuidance(t, base) {
   const page = siteUrl(base, t.page).href;
   return [
-    `${t.name} is a Pro template. Downloading it needs the user's IASoft account and an active CodePlate Pro subscription (${siteUrl(base, '/pricing/').href}).`,
+    `${t.name} is a Pro template. Downloading it needs the user's IASoft account and an active CodePlate plan that includes it: ${planLabel(t.plan)} or higher (${siteUrl(base, '/pricing/').href}).`,
     'Never ask the user for a password or token. Ask them to:',
     `  1. Open ${page} in their browser, sign in, and press Download.`,
     '  2. Tell you where the zip was saved. Then run:  codeplate get --zip "<path to the zip>"',
