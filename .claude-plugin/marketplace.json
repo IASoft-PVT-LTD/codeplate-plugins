@@ -1,0 +1,25 @@
+{
+  "name": "codeplate",
+  "owner": {
+    "name": "IASoft",
+    "url": "https://codeplate.io"
+  },
+  "description": "CodePlate's plugins for Claude Code.",
+  "plugins": [
+    {
+      "name": "codeplate",
+      "source": "./plugin",
+      "description": "Agent-first code templates from CodePlate (codeplate.io): browse the catalog, fetch a template, run its interview and keep its checks green.",
+      "version": "0.1.0",
+      "category": "development",
+      "tags": [
+        "templates",
+        "starter",
+        "game-dev",
+        "godot",
+        "unity"
+      ],
+      "license": "MIT"
+    }
+  ]
+}

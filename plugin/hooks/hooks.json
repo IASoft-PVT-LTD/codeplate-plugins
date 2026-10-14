@@ -1,0 +1,18 @@
+{
+  "description": "CodePlate guard rails inside CodePlate projects: keep .env files private, ask before editing the vendored addons/codeplate/ add-on.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|MultiEdit|Write|NotebookEdit|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/guard.mjs"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

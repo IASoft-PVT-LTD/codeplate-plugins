@@ -1,0 +1,26 @@
+{
+  "name": "codeplate",
+  "displayName": "CodePlate",
+  "version": "0.1.0",
+  "description": "Agent-first code templates from CodePlate (codeplate.io): browse the catalog, fetch a template, run its interview and keep its checks green.",
+  "author": {
+    "name": "IASoft",
+    "url": "https://codeplate.io"
+  },
+  "homepage": "https://codeplate.io",
+  "keywords": [
+    "templates",
+    "starter",
+    "boilerplate",
+    "godot",
+    "unity",
+    "tauri",
+    "expo",
+    "nextjs",
+    "astro",
+    "game-dev",
+    "agents"
+  ],
+  "license": "MIT",
+  "repository": "https://github.com/IASoft-PVT-LTD/codeplate-plugins"
+}
