@@ -10,7 +10,7 @@
       "name": "codeplate",
       "source": "./plugin",
       "description": "Agent-first code templates from CodePlate (codeplate.io): browse the catalog, fetch a template, run its interview and keep its checks green.",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "category": "development",
       "tags": [
         "templates",
