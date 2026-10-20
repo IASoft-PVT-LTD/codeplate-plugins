@@ -63,7 +63,7 @@ export function templateFiles({ id, tier = 'free', version = '1.0.0', pass = tru
     spec: 0, id, name: `Fixture ${id}`, version, kind: 'app', summary: `A fixture ${tier} template.`, tags: ['fixture', 'web'],
     stack: [{ name: 'node', version: '24.0.0' }],
     checks: { command: 'node checks/run.mjs', requires },
-    license: tier === 'pro' ? 'CodePlate-Pro-1.4' : 'CodePlate-Free-1.3', tier,
+    license: tier === 'pro' ? 'CodePlate-Pro-1.5' : 'CodePlate-Free-1.3', tier,
   };
   return {
     'codeplate.json': JSON.stringify(manifest, null, 2),
@@ -106,7 +106,7 @@ export async function fakeSite({ holding = false, tamper = false } = {}) {
   let origin;
   const entry = (id, tier, z, extra = {}) => ({
     id, name: `Fixture ${id}`, version: '1.0.0', kind: 'app', summary: `A fixture ${tier} template.`, tags: ['fixture', 'web'],
-    stack: [{ name: 'node', version: '24.0.0' }], tier, license: tier === 'pro' ? 'CodePlate-Pro-1.4' : 'CodePlate-Free-1.3',
+    stack: [{ name: 'node', version: '24.0.0' }], tier, license: tier === 'pro' ? 'CodePlate-Pro-1.5' : 'CodePlate-Free-1.3',
     page: `https://codeplate.io/t/${id}/`,
     download: tier === 'pro' ? `https://codeplate.io/download/${id}/1.0.0` : `https://codeplate.io/t/${id}/1.0.0.zip`,
     latest: tier === 'pro' ? `https://codeplate.io/download/${id}/latest` : `https://codeplate.io/t/${id}/latest.zip`,
