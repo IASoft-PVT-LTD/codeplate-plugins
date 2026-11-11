@@ -24,7 +24,7 @@ The user's request: $ARGUMENTS
 | One template's details | `codeplate show <id>` |
 | Fetch a free template | `codeplate get <id> [--dir <parent>] [--name <folder>]` |
 | Install a zip the user downloaded | `codeplate get --zip "<file>" [--dir …] [--name …]` |
-| Install from a download link the user pasted | `codeplate get --url "<link>" [--dir …] [--name …]` |
+| Install a free zip from a codeplate.io link | `codeplate get --url "<link>" [--dir …] [--name …]` |
 | Describe the project here (license, interview, tools) | `codeplate status [dir]` |
 | Run the project's checks | `codeplate check [dir]` |
 
@@ -33,10 +33,10 @@ Add `--json` to `list`, `show` and `status` when you want to parse the result.
 ## How to handle a request
 
 1. **No arguments or "what do you have?"**: run `codeplate list` and summarize it for the user grouped by kind (games, apps, documents), marking Free and Pro. Don't paste the raw table.
-2. **Picking a template**: match the user's idea to the catalog with `list <words>` and `show <id>`. Recommend one or two, say why, and say whether it's Free or which paid plan includes it (Creator, Plus or Max; `show` names it). Free templates need the credit "Built with CodePlate (codeplate.io)" in what they ship. Pro templates need an active CodePlate plan that includes them (that plan or a higher one) and no credit.
+2. **Picking a template**: match the user's idea to the catalog with `list <words>` and `show <id>`. Recommend one or two, say why, and say whether it's Free or Pro. Free templates need the credit "Built with CodePlate (codeplate.io)" in what they ship. Pro templates are sold on itch.io (`show` gives the page and price) and need no credit.
 3. **Fetching**: confirm the folder with the user first (default: a new folder named after the template inside the current directory). `get` refuses a folder that already has files in it; never delete anything to make room.
    - **Free:** `codeplate get <id>`. The script checks the zip's SHA-256 against the catalog.
-   - **Pro:** `codeplate get <id>` prints what the user has to do (exit 3). Relay it: they sign in on the template page in their browser and press Download, then either tell you where the zip is (`get --zip`) or paste the download link (`get --url`; links last a few minutes). **Never ask for or accept a password, and never try to sign in for them.** Links are only accepted from the CodePlate site.
+   - **Pro:** `codeplate get <id>` prints what the user has to do (exit 3). Relay it: they buy the template on its itch.io page and download template.zip, then tell you where the zip is (`get --zip`), or where they unzipped it (work in that folder). **Never ask for or accept a password or card details, and never try to buy it for them.**
 4. **After fetching, hand off to the template's brief.** Work inside the new folder:
    - Read its `AGENTS.md` completely before doing anything else.
    - If `docs/project.md` still contains `<!-- codeplate:project-stub -->`, run the **Interview** from `AGENTS.md` now: one short message, defaults suggested. Write the answers to `docs/project.md` as decisions and remove the marker.

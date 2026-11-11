@@ -11,7 +11,7 @@ import { extractTemplateZip, listEntries, safeSegments, ZipError } from '../scri
 import { baseUrl, filterTemplates, siteUrl } from '../scripts/lib/site.mjs';
 import { describeProject, findProjectRoot, requirements, withGodot } from '../scripts/lib/project.mjs';
 import { decide, hookOutput, isSecretEnv } from '../scripts/guard.mjs';
-import { removeTempDirs, capture, fakeSite, GOOD_GRANT, tempDir, templateFiles, templateZip, writeTree, zip, sha256 } from './helpers.mjs';
+import { removeTempDirs, capture, fakeSite, tempDir, templateFiles, templateZip, writeTree, zip, sha256 } from './helpers.mjs';
 
 const PLUGIN = fileURLToPath(new URL('..', import.meta.url));
 const REPO = join(PLUGIN, '..');
@@ -61,9 +61,9 @@ describe('unzip', () => {
     assert.throws(() => extractTemplateZip(z, tempDir()), /CRC/);
   });
 
-  test('reads zips with a comment (Pro downloads carry one)', () => {
+  test('reads zips with a comment (Pro copies from itch.io carry one)', () => {
     const dest = tempDir();
-    extractTemplateZip(templateZip({ id: 't2' }, 'CodePlate Pro License, license ID CP-0000-0000-0000'), dest);
+    extractTemplateZip(templateZip({ id: 't2' }, 'CodePlate Pro License, bought on itch.io'), dest);
     assert.ok(existsSync(join(dest, 'AGENTS.md')));
   });
 
@@ -77,13 +77,13 @@ describe('unzip', () => {
     const out = tempDir();
     const entry = packTemplate(fixture, out);
     const bytes = readFileSync(join(out, entry.file));
-    const stamped = Buffer.from(stampZip(bytes, 'fixture-game/CODEPLATE-LICENSE.txt', 'License ID: CP-1A2B-3C4D-5E6F\n', 'CodePlate Pro License, license ID CP-1A2B-3C4D-5E6F'));
+    const stamped = Buffer.from(stampZip(bytes, 'fixture-game/CODEPLATE-LICENSE.txt', 'Bought on:   itch.io\n', 'CodePlate Pro License, bought on itch.io'));
     const dest = tempDir();
     const { top, files } = extractTemplateZip(stamped, dest);
     assert.equal(top, 'fixture-game');
     assert.equal(files.length, entry.files + 1);
-    assert.equal(describeProject(dest).licenseId, null, 'the fixture manifest is Free, so no Pro license ID is claimed');
-    assert.match(readFileSync(join(dest, 'CODEPLATE-LICENSE.txt'), 'utf8'), /CP-1A2B-3C4D-5E6F/);
+    assert.equal(describeProject(dest).proLicensed, false, 'the fixture manifest is Free');
+    assert.match(readFileSync(join(dest, 'CODEPLATE-LICENSE.txt'), 'utf8'), /itch\.io/);
   });
 });
 
@@ -100,7 +100,7 @@ describe('site', () => {
   test('catalog URLs are re-rooted on the base URL', () => {
     const base = baseUrl('http://127.0.0.1:9/', {});
     assert.equal(siteUrl(base, 'https://codeplate.io/t/a/1.0.0.zip').href, 'http://127.0.0.1:9/t/a/1.0.0.zip');
-    assert.equal(siteUrl(base, '/download/a/1.0.0?grant=g').href, 'http://127.0.0.1:9/download/a/1.0.0?grant=g');
+    assert.equal(siteUrl(base, '/t/a/').href, 'http://127.0.0.1:9/t/a/');
   });
 
   test('filters by words, tier, kind and stack', () => {
@@ -137,16 +137,18 @@ describe('cli', () => {
     const r = await run(['list'], { env });
     assert.equal(r.code, 0, r.err);
     assert.match(r.out, /fixture-free\s+Free/);
-    assert.match(r.out, /fixture-pro\s+Plus/, 'a Pro template shows the cheapest plan that includes it');
-    assert.doesNotMatch(r.out, /Pro subscription/);
+    assert.match(r.out, /fixture-pro\s+Pro/);
     assert.match(r.out, /3 templates \(2 free, 1 Pro\)/);
-    assert.match(r.out, new RegExp(`${site.origin}/pricing/`));
+    assert.match(r.out, /Pro ones are sold on itch\.io/);
+    assert.doesNotMatch(r.out, /plan|pricing|subscri|sign in/i);
   });
 
-  test('show names the plan a Pro template needs', async () => {
+  test('show gives a Pro template\'s itch.io page and price', async () => {
     const r = await run(['show', 'fixture-pro'], { env });
     assert.equal(r.code, 0, r.err);
-    assert.match(r.out, /Tier:\s+Pro, Plus plan \(needs an active CodePlate plan that includes it, Plus or higher; no credit needed\)/);
+    assert.match(r.out, /Tier:\s+Pro, \$4\.99 on itch\.io \(no credit needed\)/);
+    assert.match(r.out, /itch\.io:\s+https:\/\/codeplate\.itch\.io\/fixture-pro/);
+    assert.doesNotMatch(r.out, /plan|pricing|subscri|sign in/i);
   });
 
   test('list filters and prints JSON', async () => {
@@ -194,38 +196,25 @@ describe('cli', () => {
     }
   });
 
-  test('get <pro id> explains the browser steps and never asks for a password', async () => {
+  test('get <pro id> sends the user to itch.io and never asks for a password', async () => {
     const r = await run(['get', 'fixture-pro'], { env });
     assert.equal(r.code, 3);
-    assert.match(r.out, new RegExp(`Open ${site.origin}/t/fixture-pro/ in their browser`));
+    assert.match(r.out, /Buy it on its itch\.io page, https:\/\/codeplate\.itch\.io\/fixture-pro, and download template\.zip/);
     assert.match(r.out, /get --zip/);
-    assert.match(r.out, /Never ask the user for a password/);
-    assert.ok(!site.requests.some((p) => p.startsWith('/download/')), 'no download attempted without a grant');
+    assert.match(r.out, /never ask the user for a password/);
+    assert.doesNotMatch(r.out, /sign in|plan|grant|Copy link/i);
+    assert.ok(!site.requests.some((p) => p.startsWith('/download/')), 'nothing to download from codeplate.io');
   });
 
-  test('get --url with a valid grant installs the Pro copy and hides the grant', async () => {
-    const cwd = tempDir();
-    const link = `${site.origin}/download/fixture-pro/1.0.0?grant=${encodeURIComponent(GOOD_GRANT)}`;
-    const r = await run(['get', '--url', link], { env, cwd });
-    assert.equal(r.code, 0, r.err);
-    assert.match(r.out, /CodePlate Pro License \(license ID CP-1A2B-3C4D-5E6F/);
-    assert.match(r.out, /No credit needed/);
-    assert.ok(!(r.out + r.err).includes(GOOD_GRANT), 'the grant is never printed');
-    assert.ok(existsSync(join(cwd, 'fixture-pro', 'CODEPLATE-LICENSE.txt')));
-  });
-
-  test('get --url: expired grants, other sites and odd paths are refused', async () => {
-    const expired = await run(['get', '--url', `${site.origin}/download/fixture-pro/1.0.0?grant=old`], { env });
-    assert.equal(expired.code, 1);
-    assert.match(expired.err, /press Download on the template page again/);
-    const other = await run(['get', '--url', 'https://evil.example/download/fixture-pro/1.0.0?grant=x'], { env });
+  test('get --url: only codeplate.io free zips; Pro download links, other sites and odd paths are refused', async () => {
+    const old = await run(['get', '--url', `${site.origin}/download/fixture-pro/1.0.0?grant=x`], { env });
+    assert.equal(old.code, 2);
+    assert.match(old.err, /itch\.io/);
+    const other = await run(['get', '--url', 'https://evil.example/t/fixture-free/1.0.0.zip'], { env });
     assert.equal(other.code, 2);
     assert.match(other.err, /only links from/);
     const odd = await run(['get', '--url', `${site.origin}/catalog.json`], { env });
     assert.equal(odd.code, 2);
-    const nogrant = await run(['get', '--url', `${site.origin}/download/fixture-pro/1.0.0`], { env });
-    assert.equal(nogrant.code, 2);
-    assert.match(nogrant.err, /no grant/);
   });
 
   test('get --url for a public free zip checks its hash too', async () => {
@@ -244,12 +233,13 @@ describe('cli', () => {
     assert.match(r.err, /redirect to another site/);
   });
 
-  test('get --zip installs a zip the user downloaded', async () => {
+  test('get --zip installs a zip the user downloaded (a Pro one bought on itch.io)', async () => {
     const cwd = tempDir();
     writeFileSync(join(cwd, 'dl.zip'), site.pro);
     const r = await run(['get', '--zip', 'dl.zip', '--dir', 'projects'], { env, cwd });
     assert.equal(r.code, 0, r.err);
     assert.ok(existsSync(join(cwd, 'projects', 'fixture-pro', 'AGENTS.md')));
+    assert.match(r.out, /CodePlate Pro License\. No credit needed/);
     const notzip = join(cwd, 'x.zip');
     writeFileSync(notzip, '<html>');
     assert.equal((await run(['get', '--zip', notzip], { env, cwd })).code, 1);

@@ -66,7 +66,6 @@ export function describeProject(root) {
   const m = readManifest(root);
   const project = existsSync(join(root, 'docs', 'project.md')) ? readFileSync(join(root, 'docs', 'project.md'), 'utf8') : null;
   const pro = /^CodePlate-Pro-/.test(m.license ?? '');
-  const licenseFile = join(root, 'CODEPLATE-LICENSE.txt');
   return {
     root,
     id: m.id,
@@ -77,7 +76,6 @@ export function describeProject(root) {
     license: m.license,
     stack: m.stack,
     proLicensed: pro,
-    licenseId: pro && existsSync(licenseFile) ? (readFileSync(licenseFile, 'utf8').match(/CP-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}/)?.[0] ?? null) : null,
     creditRequired: !pro,
     credit: pro ? null : FREE_CREDIT,
     brief: existsSync(join(root, 'AGENTS.md')) ? 'AGENTS.md' : null,

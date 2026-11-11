@@ -63,7 +63,7 @@ export function templateFiles({ id, tier = 'free', version = '1.0.0', pass = tru
     spec: 0, id, name: `Fixture ${id}`, version, kind: 'app', summary: `A fixture ${tier} template.`, tags: ['fixture', 'web'],
     stack: [{ name: 'node', version: '24.0.0' }],
     checks: { command: 'node checks/run.mjs', requires },
-    license: tier === 'pro' ? 'CodePlate-Pro-1.6' : 'CodePlate-Free-1.3', tier,
+    license: tier === 'pro' ? 'CodePlate-Pro-1.7' : 'CodePlate-Free-1.4', tier,
   };
   return {
     'codeplate.json': JSON.stringify(manifest, null, 2),
@@ -93,30 +93,29 @@ const made = [];
 export const tempDir = (p = 'cp-plugin-') => { const d = mkdtempSync(join(tmpdir(), p)); made.push(d); return d; };
 export const removeTempDirs = () => { for (const d of made.splice(0)) rmSync(d, { recursive: true, force: true }); };
 
-export const GOOD_GRANT = 'fixture-pro.1.0.0.CP-1A2B-3C4D-5E6F.9999999999999.' + 'a'.repeat(64);
-
 /**
- * A fake codeplate.io: /catalog.json, /t/<id>/<version>.zip, /download/<id>/<version>?grant=…
- * (GOOD_GRANT works, anything else gets the Worker's 403 page). `holding: true` serves an HTML
- * holding page for every path, like the site while it's offline.
+ * A fake codeplate.io: /catalog.json and /t/<id>/<version>.zip. Pro templates have no download
+ * here: the catalog points at their itch.io page (`pro` is the zip a buyer gets there).
+ * `holding: true` serves an HTML holding page for every path, like the site while it's offline.
  */
 export async function fakeSite({ holding = false, tamper = false } = {}) {
   const free = templateZip({ id: 'fixture-free' });
-  const pro = templateZip({ id: 'fixture-pro', tier: 'pro', extra: { 'CODEPLATE-LICENSE.txt': 'CodePlate Pro License\nLicense ID: CP-1A2B-3C4D-5E6F\n' } }, 'CodePlate Pro License, license ID CP-1A2B-3C4D-5E6F');
+  const pro = templateZip({ id: 'fixture-pro', tier: 'pro', extra: { 'CODEPLATE-LICENSE.txt': 'CodePlate Pro License: licensed copy\nBought on:   itch.io (codeplate.itch.io)\n' } }, 'CodePlate Pro License, bought on itch.io');
   let origin;
   const entry = (id, tier, z, extra = {}) => ({
     id, name: `Fixture ${id}`, version: '1.0.0', kind: 'app', summary: `A fixture ${tier} template.`, tags: ['fixture', 'web'],
-    stack: [{ name: 'node', version: '24.0.0' }], tier, license: tier === 'pro' ? 'CodePlate-Pro-1.6' : 'CodePlate-Free-1.3',
+    stack: [{ name: 'node', version: '24.0.0' }], tier, license: tier === 'pro' ? 'CodePlate-Pro-1.7' : 'CodePlate-Free-1.4',
     page: `https://codeplate.io/t/${id}/`,
-    download: tier === 'pro' ? `https://codeplate.io/download/${id}/1.0.0` : `https://codeplate.io/t/${id}/1.0.0.zip`,
-    latest: tier === 'pro' ? `https://codeplate.io/download/${id}/latest` : `https://codeplate.io/t/${id}/latest.zip`,
-    bytes: z.length, sha256: tamper ? '0'.repeat(64) : sha256(z), checks: 'node checks/run.mjs', media: [], ...extra,
+    ...(tier === 'pro'
+      ? {}
+      : { download: `https://codeplate.io/t/${id}/1.0.0.zip`, latest: `https://codeplate.io/t/${id}/latest.zip`, bytes: z.length, sha256: tamper ? '0'.repeat(64) : sha256(z) }),
+    checks: 'node checks/run.mjs', media: [], ...extra,
   });
   const catalog = {
     spec: 0, updated: '2026-10-14',
     templates: [
       entry('fixture-free', 'free', free),
-      entry('fixture-pro', 'pro', pro, { plan: 'plus', requires: 'An active CodePlate plan that includes it: Plus or Max.' }),
+      entry('fixture-pro', 'pro', pro, { itch: 'https://codeplate.itch.io/fixture-pro', price: '$4.99', requires: 'Pro templates are sold on itch.io.' }),
       { ...entry('fixture-game', 'free', free), kind: 'game', stack: [{ name: 'godot', version: '4.7.2' }], tags: ['match-3', 'puzzle'], summary: 'A fixture game.' },
     ],
   };
@@ -129,10 +128,6 @@ export async function fakeSite({ holding = false, tamper = false } = {}) {
     if (u.pathname === '/catalog.json') return send(200, 'application/json', JSON.stringify(catalog));
     if (u.pathname === '/t/fixture-free/1.0.0.zip' || u.pathname === '/t/fixture-free/latest.zip') return send(200, 'application/zip', free);
     if (u.pathname === '/away') { res.writeHead(302, { location: 'https://example.com/x.zip' }); return res.end(); }
-    if (u.pathname === '/download/fixture-pro/1.0.0') {
-      if (u.searchParams.get('grant') === GOOD_GRANT) return send(200, 'application/zip', pro);
-      return send(403, 'text/html; charset=utf-8', "<h1>That download link didn't work</h1>");
-    }
     send(404, 'text/html; charset=utf-8', '<h1>This plate is empty.</h1>');
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));

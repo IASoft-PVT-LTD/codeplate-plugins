@@ -5,13 +5,13 @@
 //   node codeplate.mjs list [words...] [--tier free|pro] [--kind game|app|document] [--stack godot] [--json]
 //   node codeplate.mjs show <id> [--json]
 //   node codeplate.mjs get <id>          [--dir <parent>] [--name <folder>]   free templates
-//   node codeplate.mjs get --url <link>  [--dir <parent>] [--name <folder>]   a download link from codeplate.io
-//   node codeplate.mjs get --zip <file>  [--dir <parent>] [--name <folder>]   a zip the user downloaded
+//   node codeplate.mjs get --url <link>  [--dir <parent>] [--name <folder>]   a free zip link from codeplate.io
+//   node codeplate.mjs get --zip <file>  [--dir <parent>] [--name <folder>]   a zip the user downloaded (a Pro one from itch.io)
 //   node codeplate.mjs status [dir] [--json]
 //   node codeplate.mjs check  [dir]
 //
 // Every command takes --base-url <url> (else $CODEPLATE_BASE_URL, else https://codeplate.io).
-// Exit codes: 0 ok, 1 failed, 2 usage, 3 needs the user (Pro download, missing tool).
+// Exit codes: 0 ok, 1 failed, 2 usage, 3 needs the user (a Pro template to buy on itch.io, a missing tool).
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -52,17 +52,8 @@ export function parseArgs(argv) {
 class UsageError extends Error {}
 class NeedsUser extends Error {}
 
-const redact = (u) => {
-  const url = new URL(u);
-  if (url.searchParams.has('grant')) url.searchParams.set('grant', '…');
-  return decodeURIComponent(url.href);
-};
-
-const planLabel = (plan) => (plan ? plan[0].toUpperCase() + plan.slice(1) : 'a paid');
-// "Free", or the cheapest paid plan that includes a Pro template ("Plus").
-function tierLabel(t) {
-  return t.tier === 'pro' ? (t.plan ? planLabel(t.plan) : 'Pro') : 'Free';
-}
+// "Free", or "Pro" (sold on itch.io).
+const tierLabel = (t) => (t.tier === 'pro' ? 'Pro' : 'Free');
 
 function printTemplateLine(t, out) {
   out.write(`${t.id.padEnd(28)} ${tierLabel(t).padEnd(7)} ${String(t.kind).padEnd(4)} v${String(t.version).padEnd(7)} ${stackLabel(t.stack)}\n`);
@@ -82,7 +73,7 @@ async function cmdList({ args, opts }, io, base) {
   }
   for (const t of list) printTemplateLine(t, io.out);
   const pro = list.filter((t) => t.tier === 'pro').length;
-  io.out.write(`\n${list.length} template${list.length === 1 ? '' : 's'} (${list.length - pro} free, ${pro} Pro). Free templates download with no account and need the credit "${FREE_CREDIT}". Pro ones need a CodePlate plan that includes them (Creator, Plus or Max, as listed): ${siteUrl(base, '/pricing/').href}\n`);
+  io.out.write(`\n${list.length} template${list.length === 1 ? '' : 's'} (${list.length - pro} free, ${pro} Pro). Free templates download with no account and need the credit "${FREE_CREDIT}". Pro ones are sold on itch.io: the user buys and downloads them there ("show <id>" gives the page).\n`);
   return 0;
 }
 
@@ -107,7 +98,7 @@ async function cmdShow({ args, opts }, io, base) {
     `${t.name} (${t.id}) v${t.version}`,
     t.summary,
     '',
-    `Tier:     ${t.tier === 'pro' ? `Pro, ${planLabel(t.plan)} plan (needs an active CodePlate plan that includes it, ${planLabel(t.plan)} or higher; no credit needed)` : `Free (no account needed; credit "${FREE_CREDIT}" required unless downloaded with a CodePlate plan)`}`,
+    `Tier:     ${t.tier === 'pro' ? `Pro, ${t.price ?? 'paid'} on itch.io (no credit needed)` : `Free (no account needed; credit "${FREE_CREDIT}" required)`}`,
     `Kind:     ${t.kind}`,
     `Stack:    ${stackLabel(t.stack)}`,
     `Tags:     ${(t.tags ?? []).join(', ')}`,
@@ -115,7 +106,8 @@ async function cmdShow({ args, opts }, io, base) {
     `Size:     ${t.bytes ? `${Math.round(t.bytes / 1024)} KB zip` : 'unknown'}`,
     `Page:     ${siteUrl(base, t.page).href}`,
     ...(t.demo ? [`Demo:     ${siteUrl(base, t.demo).href}`] : []),
-    `Get it:   ${t.tier === 'pro' ? 'Pro: the user downloads it from the page (see "get")' : `codeplate get ${t.id}`}`,
+    ...(t.itch ? [`itch.io:  ${t.itch}`] : []),
+    `Get it:   ${t.tier === 'pro' ? 'Pro: the user buys it on its itch.io page (see "get")' : `codeplate get ${t.id}`}`,
   ];
   io.out.write(lines.join('\n') + '\n');
   return 0;
@@ -144,7 +136,7 @@ function installZip(bytes, { dest, expectId }, io) {
   io.out.write([
     `Installed ${m.name} v${m.version} into ${dest} (${files.length} files).`,
     p.proLicensed
-      ? `License: CodePlate Pro License${p.licenseId ? ` (license ID ${p.licenseId}, in CODEPLATE-LICENSE.txt)` : ''}. No credit needed.`
+      ? 'License: CodePlate Pro License. No credit needed.'
       : `License: CodePlate Free License. Anything shipped from it must show "${FREE_CREDIT}" (e.g. on an About or credits screen).`,
     'Next:',
     `  1. Work inside ${dest}. Read AGENTS.md there first, all of it.`,
@@ -155,13 +147,12 @@ function installZip(bytes, { dest, expectId }, io) {
 }
 
 function proGuidance(t, base) {
-  const page = siteUrl(base, t.page).href;
+  const shop = t.itch ?? siteUrl(base, t.page).href;
   return [
-    `${t.name} is a Pro template. Downloading it needs the user's IASoft account and an active CodePlate plan that includes it: ${planLabel(t.plan)} or higher (${siteUrl(base, '/pricing/').href}).`,
-    'Never ask the user for a password or token. Ask them to:',
-    `  1. Open ${page} in their browser, sign in, and press Download.`,
+    `${t.name} is a Pro template, sold on itch.io${t.price ? ` (${t.price})` : ''}. You can't buy or download it yourself, and never ask the user for a password or card details. Ask them to:`,
+    `  1. Buy it on its itch.io page, ${shop}, and download template.zip.`,
     '  2. Tell you where the zip was saved. Then run:  codeplate get --zip "<path to the zip>"',
-    '     (Or paste the download link, which works for a few minutes. Then run:  codeplate get --url "<link>")',
+    '     (If they already unzipped it, work in that folder: codeplate status "<folder>")',
   ].join('\n');
 }
 
@@ -185,24 +176,18 @@ async function cmdGet({ args, opts }, io, base) {
       throw new UsageError('--url must be a full https:// link');
     }
     if (base.protocol !== 'file:' && link.origin !== base.origin) throw new UsageError(`only links from ${base.origin} are accepted (got ${link.origin})`);
-    const dl = link.pathname.match(/^\/download\/([a-z0-9-]+)\/(\d+\.\d+\.\d+)$/);
     const free = link.pathname.match(/^\/t\/([a-z0-9-]+)\/(\d+\.\d+\.\d+|latest)\.zip$/);
-    if (!dl && !free) throw new UsageError('that isn\'t a CodePlate download link (expected /download/<id>/<version>?grant=… or /t/<id>/<version>.zip)');
-    if (dl && !link.searchParams.get('grant')) throw new UsageError('that Pro link has no grant: ask the user to press Download on the template page and paste the new link');
-    const id = (dl ?? free)[1];
+    if (!free) throw new UsageError('that isn\'t a CodePlate download link (expected /t/<id>/<version>.zip). A Pro template comes from itch.io: ask the user for the downloaded zip and use --zip');
+    const id = free[1];
     const dest = destination(opts, id, cwd);
-    io.err.write(`Downloading ${redact(link.href)}\n`);
+    io.err.write(`Downloading ${link.href}\n`);
     const res = await get(base.protocol === 'file:' ? siteUrl(base, link.href) : link, { ...io, accept: 'application/zip' });
     if (res.status !== 200 || !/zip|octet-stream/.test(res.type)) {
-      throw new SiteError(res.status === 403 || res.status === 404
-        ? `the site refused that link (${res.status}). Pro links work for a few minutes and for one version: ask the user to press Download on the template page again and paste the new link.`
-        : `download failed (${res.status}, ${res.type || 'no type'})`, { status: res.status, code: 'download' });
+      throw new SiteError(`download failed (${res.status}, ${res.type || 'no type'})`, { status: res.status, code: 'download' });
     }
-    if (free) {
-      // Public zips are byte-identical to the catalog's: check the hash when the catalog is reachable.
-      const t = await loadCatalog(base, io).then((c) => findTemplate(c, id)).catch(() => null);
-      if (t?.sha256 && (free[2] === 'latest' || free[2] === t.version)) verifyHash(res.bytes, t.sha256);
-    }
+    // Public zips are byte-identical to the catalog's: check the hash when the catalog is reachable.
+    const t = await loadCatalog(base, io).then((c) => findTemplate(c, id)).catch(() => null);
+    if (t?.sha256 && (free[2] === 'latest' || free[2] === t.version)) verifyHash(res.bytes, t.sha256);
     return installZip(res.bytes, { dest, expectId: id }, io);
   }
 
@@ -249,7 +234,7 @@ function cmdStatus({ args, opts }, io) {
   }
   io.out.write([
     `${p.name} (${p.id}) v${p.version} at ${p.root}`,
-    `License:   ${p.proLicensed ? `CodePlate Pro License${p.licenseId ? `, license ID ${p.licenseId}` : ''}: no credit needed` : `CodePlate Free License: ship the credit "${p.credit}"`}`,
+    `License:   ${p.proLicensed ? 'CodePlate Pro License: no credit needed' : `CodePlate Free License: ship the credit "${p.credit}"`}`,
     `Brief:     ${p.brief ? 'AGENTS.md (read it before changing anything)' : 'missing AGENTS.md!'}`,
     `Interview: ${p.interviewDone ? 'done (docs/project.md has decisions)' : 'not done yet (docs/project.md is the stub)'}`,
     `Checks:    ${p.checks.command}`,

@@ -20,7 +20,7 @@ Or, inside Claude Code, run `/plugin`, add the marketplace `IASoft-PVT-LTD/codep
 ## Fetching templates
 
 - **Free templates:** `get <id>` downloads the zip, checks its SHA-256 against the catalog and unpacks it into a new, empty folder.
-- **Pro templates** need a CodePlate plan. The plugin never asks for passwords or tokens: sign in on the template's page in your browser, then either press **Download** and tell Claude where the zip is, or press **Copy link for your agent** and paste the link (it works for a few minutes, for that one version).
+- **Pro templates** are sold on itch.io. Buy one on its itch.io page, download template.zip, and tell Claude where it is; `get --zip` unpacks it. The plugin never asks for passwords or card details.
 
 `CODEPLATE_BASE_URL` points the plugin at another copy of the site (for example a local preview). It is not a secret.
 
