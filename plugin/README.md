@@ -13,17 +13,16 @@ Or, inside Claude Code, run `/plugin`, add the marketplace `IASoft-PVT-LTD/codep
 
 ## What you get
 
-- **`/codeplate [list | show <id> | get <id> | status | check]`**: browse and search the catalog, see a template, fetch it into a new folder, and run its checks. Claude also uses it on its own when you ask for a CodePlate template.
+- **`/codeplate [list | show <id> | get <id> | status | check]`**: browse and search the catalog, see a template, install the template.zip you downloaded into a new folder, and run its checks. Claude also uses it on its own when you ask for a CodePlate template.
 - **`codeplate:workflow`**: teaches Claude the CodePlate loop: read the template's `AGENTS.md` first, run its interview, record decisions in `docs/project.md`, use its recipes, run the checks after every change, and keep the license credit on free templates.
 - **A guard hook** that only acts inside CodePlate projects: it blocks reading, editing or searching `.env` files (`.env.example` stays readable) and asks before edits to a vendored `addons/codeplate/` folder. It's a guard rail, not a sandbox.
 
-## Fetching templates
+## Getting a template
 
-- **Free templates:** `get <id>` downloads the zip, checks its SHA-256 against the catalog and unpacks it into a new, empty folder.
-- **Pro templates** are sold on itch.io. Buy one on its itch.io page, download template.zip, and tell Claude where it is; `get --zip` unpacks it. The plugin never asks for passwords or card details.
+Every template, free or Pro, downloads from its page on [itch.io](https://codeplate.itch.io/), and you do the download yourself: free ones at $0 with no account, Pro ones after you buy them. `get <id>` tells Claude which page to send you to. Download template.zip there and tell Claude where it is; `get --zip` unpacks it into a new, empty folder. The plugin never asks for passwords or card details.
 
 `CODEPLATE_BASE_URL` points the plugin at another copy of the site (for example a local preview). It is not a secret.
 
 ## License
 
-The plugin is MIT licensed (see [LICENSE](LICENSE)). The templates it downloads have their own licenses: see [codeplate.io/license](https://codeplate.io/license/).
+The plugin is MIT licensed (see [LICENSE](LICENSE)). The templates it installs have their own licenses: see [codeplate.io/license](https://codeplate.io/license/).

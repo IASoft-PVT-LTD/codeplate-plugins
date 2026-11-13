@@ -94,29 +94,27 @@ export const tempDir = (p = 'cp-plugin-') => { const d = mkdtempSync(join(tmpdir
 export const removeTempDirs = () => { for (const d of made.splice(0)) rmSync(d, { recursive: true, force: true }); };
 
 /**
- * A fake codeplate.io: /catalog.json and /t/<id>/<version>.zip. Pro templates have no download
- * here: the catalog points at their itch.io page (`pro` is the zip a buyer gets there).
+ * A fake codeplate.io: /catalog.json only. No template downloads from codeplate.io: the catalog points
+ * every template at its itch.io page (`free` and `pro` are the zips a user gets there).
  * `holding: true` serves an HTML holding page for every path, like the site while it's offline.
  */
-export async function fakeSite({ holding = false, tamper = false } = {}) {
+export async function fakeSite({ holding = false } = {}) {
   const free = templateZip({ id: 'fixture-free' });
   const pro = templateZip({ id: 'fixture-pro', tier: 'pro', extra: { 'CODEPLATE-LICENSE.txt': 'CodePlate Pro License: licensed copy\nBought on:   itch.io (codeplate.itch.io)\n' } }, 'CodePlate Pro License, bought on itch.io');
   let origin;
-  const entry = (id, tier, z, extra = {}) => ({
+  const entry = (id, tier, extra = {}) => ({
     id, name: `Fixture ${id}`, version: '1.0.0', kind: 'app', summary: `A fixture ${tier} template.`, tags: ['fixture', 'web'],
     stack: [{ name: 'node', version: '24.0.0' }], tier, license: tier === 'pro' ? 'CodePlate-Pro-1.7' : 'CodePlate-Free-1.4',
-    page: `https://codeplate.io/t/${id}/`,
-    ...(tier === 'pro'
-      ? {}
-      : { download: `https://codeplate.io/t/${id}/1.0.0.zip`, latest: `https://codeplate.io/t/${id}/latest.zip`, bytes: z.length, sha256: tamper ? '0'.repeat(64) : sha256(z) }),
+    page: `https://codeplate.io/t/${id}/`, itch: `https://codeplate.itch.io/${id}`,
+    requires: tier === 'pro' ? 'Pro templates are sold on itch.io.' : 'Free templates download from itch.io.',
     checks: 'node checks/run.mjs', media: [], ...extra,
   });
   const catalog = {
-    spec: 0, updated: '2026-10-14',
+    spec: 0, updated: '2026-11-12',
     templates: [
-      entry('fixture-free', 'free', free),
-      entry('fixture-pro', 'pro', pro, { itch: 'https://codeplate.itch.io/fixture-pro', price: '$4.99', requires: 'Pro templates are sold on itch.io.' }),
-      { ...entry('fixture-game', 'free', free), kind: 'game', stack: [{ name: 'godot', version: '4.7.2' }], tags: ['match-3', 'puzzle'], summary: 'A fixture game.' },
+      entry('fixture-free', 'free'),
+      entry('fixture-pro', 'pro', { price: '$4.99' }),
+      { ...entry('fixture-game', 'free'), kind: 'game', stack: [{ name: 'godot', version: '4.7.2' }], tags: ['match-3', 'puzzle'], summary: 'A fixture game.' },
     ],
   };
   const requests = [];
@@ -126,7 +124,6 @@ export async function fakeSite({ holding = false, tamper = false } = {}) {
     const send = (status, type, body) => { res.writeHead(status, { 'content-type': type }); res.end(body); };
     if (holding) return send(200, 'text/html; charset=utf-8', '<!doctype html><title>CodePlate</title><p>Back soon.</p>');
     if (u.pathname === '/catalog.json') return send(200, 'application/json', JSON.stringify(catalog));
-    if (u.pathname === '/t/fixture-free/1.0.0.zip' || u.pathname === '/t/fixture-free/latest.zip') return send(200, 'application/zip', free);
     if (u.pathname === '/away') { res.writeHead(302, { location: 'https://example.com/x.zip' }); return res.end(); }
     send(404, 'text/html; charset=utf-8', '<h1>This plate is empty.</h1>');
   });

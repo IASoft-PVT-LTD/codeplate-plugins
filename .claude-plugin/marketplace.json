@@ -9,8 +9,8 @@
     {
       "name": "codeplate",
       "source": "./plugin",
-      "description": "Agent-first code templates from CodePlate (codeplate.io): browse the catalog, fetch a template, run its interview and keep its checks green.",
-      "version": "0.2.0",
+      "description": "Agent-first code templates from CodePlate (codeplate.io): browse the catalog, install a template downloaded from itch.io, run its interview and keep its checks green.",
+      "version": "0.3.0",
       "category": "development",
       "tags": [
         "templates",

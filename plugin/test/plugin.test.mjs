@@ -139,7 +139,7 @@ describe('cli', () => {
     assert.match(r.out, /fixture-free\s+Free/);
     assert.match(r.out, /fixture-pro\s+Pro/);
     assert.match(r.out, /3 templates \(2 free, 1 Pro\)/);
-    assert.match(r.out, /Pro ones are sold on itch\.io/);
+    assert.match(r.out, /Every template downloads from its itch\.io page, and only the user can download it/);
     assert.doesNotMatch(r.out, /plan|pricing|subscri|sign in/i);
   });
 
@@ -168,32 +168,17 @@ describe('cli', () => {
     assert.match(u.err, /Did you mean: fixture-free/);
   });
 
-  test('get <free id> downloads, verifies and installs, then points at AGENTS.md', async () => {
+  test('get <free id> downloads nothing: it sends the user to the itch.io page (free), then get --zip', async () => {
     const cwd = tempDir();
-    const r = await run(['get', 'fixture-free', '--name', 'my-app'], { env, cwd });
-    assert.equal(r.code, 0, r.err);
-    const dest = join(cwd, 'my-app');
-    assert.ok(existsSync(join(dest, 'AGENTS.md')));
-    assert.match(r.out, /Read AGENTS.md there first/);
-    assert.match(r.out, /Interview/);
+    const before = site.requests.length;
+    const r = await run(['get', 'fixture-free'], { env, cwd });
+    assert.equal(r.code, 3);
+    assert.match(r.out, /fixture-free is a free template\. It downloads from itch\.io \(\$0, no account needed\), and you can't download it yourself/);
+    assert.match(r.out, /Open its itch\.io page, https:\/\/codeplate\.itch\.io\/fixture-free, and download template\.zip/);
+    assert.match(r.out, /codeplate get --zip "<path to the zip>"/);
     assert.match(r.out, /Built with CodePlate \(codeplate\.io\)/);
-    // A second get into the same folder is refused, and nothing is overwritten.
-    const again = await run(['get', 'fixture-free', '--name', 'my-app'], { env, cwd });
-    assert.equal(again.code, 2);
-    assert.match(again.err, /isn't empty/);
-  });
-
-  test('get refuses a zip whose SHA-256 differs from the catalog', async () => {
-    const bad = await fakeSite({ tamper: true });
-    try {
-      const cwd = tempDir();
-      const r = await run(['get', 'fixture-free'], { env: { CODEPLATE_BASE_URL: bad.origin }, cwd });
-      assert.equal(r.code, 1);
-      assert.match(r.err, /SHA-256 mismatch/);
-      assert.equal(existsSync(join(cwd, 'fixture-free')), false);
-    } finally {
-      await bad.close();
-    }
+    assert.deepEqual(readdirSync(cwd), [], 'nothing installed');
+    assert.deepEqual(site.requests.slice(before), ['/catalog.json'], 'only the catalog is read');
   });
 
   test('get <pro id> sends the user to itch.io and never asks for a password', async () => {
@@ -203,34 +188,34 @@ describe('cli', () => {
     assert.match(r.out, /get --zip/);
     assert.match(r.out, /never ask the user for a password/);
     assert.doesNotMatch(r.out, /sign in|plan|grant|Copy link/i);
-    assert.ok(!site.requests.some((p) => p.startsWith('/download/')), 'nothing to download from codeplate.io');
+    assert.ok(!site.requests.some((p) => /\.zip$|^\/download\//.test(p)), 'nothing to download from codeplate.io');
   });
 
-  test('get --url: only codeplate.io free zips; Pro download links, other sites and odd paths are refused', async () => {
-    const old = await run(['get', '--url', `${site.origin}/download/fixture-pro/1.0.0?grant=x`], { env });
-    assert.equal(old.code, 2);
-    assert.match(old.err, /itch\.io/);
-    const other = await run(['get', '--url', 'https://evil.example/t/fixture-free/1.0.0.zip'], { env });
-    assert.equal(other.code, 2);
-    assert.match(other.err, /only links from/);
-    const odd = await run(['get', '--url', `${site.origin}/catalog.json`], { env });
-    assert.equal(odd.code, 2);
+  test('get --url is gone', async () => {
+    const r = await run(['get', '--url', `${site.origin}/t/fixture-free/latest.zip`], { env });
+    assert.equal(r.code, 2);
+    assert.match(r.err, /unknown option --url/);
   });
 
-  test('get --url for a public free zip checks its hash too', async () => {
+  test('get --zip installs a free template.zip from itch.io, then points at AGENTS.md', async () => {
     const cwd = tempDir();
-    const r = await run(['get', '--url', `${site.origin}/t/fixture-free/latest.zip`, '--name', 'x'], { env, cwd });
+    writeFileSync(join(cwd, 'template.zip'), site.free);
+    const r = await run(['get', '--zip', 'template.zip', '--name', 'my-app'], { env, cwd });
     assert.equal(r.code, 0, r.err);
-    assert.ok(existsSync(join(cwd, 'x', 'codeplate.json')));
+    const dest = join(cwd, 'my-app');
+    assert.ok(existsSync(join(dest, 'AGENTS.md')));
+    assert.match(r.out, /Read AGENTS.md there first/);
+    assert.match(r.out, /Interview/);
+    assert.match(r.out, /Built with CodePlate \(codeplate\.io\)/);
+    // A second install into the same folder is refused, and nothing is overwritten.
+    const again = await run(['get', '--zip', 'template.zip', '--name', 'my-app'], { env, cwd });
+    assert.equal(again.code, 2);
+    assert.match(again.err, /isn't empty/);
   });
 
-  test('redirects to another site are refused', async () => {
-    const r = await run(['get', '--url', `${site.origin}/t/fixture-free/1.0.0.zip`], {
-      env,
-      fetchImpl: async () => new Response(null, { status: 302, headers: { location: 'https://example.com/x.zip' } }),
-    });
-    assert.equal(r.code, 1);
-    assert.match(r.err, /redirect to another site/);
+  test('get takes an id or --zip, not both', async () => {
+    const r = await run(['get', 'fixture-free', '--zip', 'x.zip'], { env });
+    assert.equal(r.code, 2);
   });
 
   test('get --zip installs a zip the user downloaded (a Pro one bought on itch.io)', async () => {
@@ -246,7 +231,9 @@ describe('cli', () => {
   });
 
   test('--name must be a plain folder name', async () => {
-    const r = await run(['get', 'fixture-free', '--name', '../up'], { env });
+    const cwd = tempDir();
+    writeFileSync(join(cwd, 'template.zip'), site.free);
+    const r = await run(['get', '--zip', 'template.zip', '--name', '../up'], { env, cwd });
     assert.equal(r.code, 2);
   });
 
@@ -271,14 +258,12 @@ describe('cli', () => {
 describe('cli with a file:// base (offline fixtures)', () => {
   test('list and get work from a folder laid out like the site', async () => {
     const root = tempDir();
-    const z = templateZip({ id: 'offline-one' });
-    writeTree(root, { 't/offline-one/1.0.0.zip': z });
-    writeFileSync(join(root, 'catalog.json'), JSON.stringify({ spec: 0, templates: [{ id: 'offline-one', name: 'Offline', version: '1.0.0', kind: 'app', summary: 's', tags: [], stack: [], tier: 'free', page: 'https://codeplate.io/t/offline-one/', download: 'https://codeplate.io/t/offline-one/1.0.0.zip', sha256: sha256(z), checks: 'node checks/run.mjs' }] }));
+    writeFileSync(join(root, 'catalog.json'), JSON.stringify({ spec: 0, templates: [{ id: 'offline-one', name: 'Offline', version: '1.0.0', kind: 'app', summary: 's', tags: [], stack: [], tier: 'free', page: 'https://codeplate.io/t/offline-one/', itch: 'https://codeplate.itch.io/offline-one', checks: 'node checks/run.mjs' }] }));
     const env = { CODEPLATE_BASE_URL: pathToFileURL(root).href };
     assert.match((await run(['list'], { env })).out, /offline-one/);
-    const cwd = tempDir();
-    assert.equal((await run(['get', 'offline-one'], { env, cwd })).code, 0);
-    assert.ok(existsSync(join(cwd, 'offline-one', 'AGENTS.md')));
+    const r = await run(['get', 'offline-one'], { env });
+    assert.equal(r.code, 3);
+    assert.match(r.out, /https:\/\/codeplate\.itch\.io\/offline-one/);
   });
 });
 

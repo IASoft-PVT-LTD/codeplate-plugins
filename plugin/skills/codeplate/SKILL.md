@@ -1,6 +1,6 @@
 ---
 name: codeplate
-description: Browse, fetch and verify CodePlate (codeplate.io) templates, agent-first starter projects for Godot and Unity games, Tauri desktop apps, Expo mobile apps, Next.js SaaS, AI chat apps, Astro sites, Discord bots and browser extensions. Use when the user asks for a CodePlate template, wants to start a game or app from a template, starter or boilerplate and CodePlate fits, or wants to run a CodePlate project's checks.
+description: Browse, install and verify CodePlate (codeplate.io) templates, agent-first starter projects for Godot and Unity games, Tauri desktop apps, Expo mobile apps, Next.js SaaS, AI chat apps, Astro sites, Discord bots and browser extensions. Use when the user asks for a CodePlate template, wants to start a game or app from a template, starter or boilerplate and CodePlate fits, or wants to run a CodePlate project's checks.
 argument-hint: "[list [words] | show <id> | get <id> | status | check]"
 ---
 
@@ -22,9 +22,8 @@ The user's request: $ARGUMENTS
 |---|---|
 | Browse or search the catalog | `codeplate list [words…] [--tier free\|pro] [--kind game\|app] [--stack godot]` |
 | One template's details | `codeplate show <id>` |
-| Fetch a free template | `codeplate get <id> [--dir <parent>] [--name <folder>]` |
-| Install a zip the user downloaded | `codeplate get --zip "<file>" [--dir …] [--name …]` |
-| Install a free zip from a codeplate.io link | `codeplate get --url "<link>" [--dir …] [--name …]` |
+| Where the user downloads a template | `codeplate get <id>` |
+| Install the template.zip the user downloaded | `codeplate get --zip "<file>" [--dir <parent>] [--name <folder>]` |
 | Describe the project here (license, interview, tools) | `codeplate status [dir]` |
 | Run the project's checks | `codeplate check [dir]` |
 
@@ -33,11 +32,12 @@ Add `--json` to `list`, `show` and `status` when you want to parse the result.
 ## How to handle a request
 
 1. **No arguments or "what do you have?"**: run `codeplate list` and summarize it for the user grouped by kind (games, apps, documents), marking Free and Pro. Don't paste the raw table.
-2. **Picking a template**: match the user's idea to the catalog with `list <words>` and `show <id>`. Recommend one or two, say why, and say whether it's Free or Pro. Free templates need the credit "Built with CodePlate (codeplate.io)" in what they ship. Pro templates are sold on itch.io (`show` gives the page and price) and need no credit.
-3. **Fetching**: confirm the folder with the user first (default: a new folder named after the template inside the current directory). `get` refuses a folder that already has files in it; never delete anything to make room.
-   - **Free:** `codeplate get <id>`. The script checks the zip's SHA-256 against the catalog.
-   - **Pro:** `codeplate get <id>` prints what the user has to do (exit 3). Relay it: they buy the template on its itch.io page and download template.zip, then tell you where the zip is (`get --zip`), or where they unzipped it (work in that folder). **Never ask for or accept a password or card details, and never try to buy it for them.**
-4. **After fetching, hand off to the template's brief.** Work inside the new folder:
+2. **Picking a template**: match the user's idea to the catalog with `list <words>` and `show <id>`. Recommend one or two, say why, and say whether it's Free or Pro. Free templates need the credit "Built with CodePlate (codeplate.io)" in what they ship. Pro templates cost money on itch.io (`show` gives the page and price) and need no credit.
+3. **Getting it**: every template, Free and Pro, downloads only from its itch.io page, and only the user can download it. You can't fetch it.
+   - Run `codeplate get <id>`. It prints what the user has to do (exit 3): download template.zip from the template's itch.io page (free at $0, or after buying a Pro one). Relay it, with the link.
+   - When they say where the zip is, confirm the folder with them (default: a new folder named after the template inside the current directory), then run `codeplate get --zip "<file>"`. It refuses a folder that already has files in it; never delete anything to make room. If they unzipped it themselves, work in that folder.
+   - **Never ask for or accept a password or card details, and never try to buy or download it for them.**
+4. **After installing, hand off to the template's brief.** Work inside the new folder:
    - Read its `AGENTS.md` completely before doing anything else.
    - If `docs/project.md` still contains `<!-- codeplate:project-stub -->`, run the **Interview** from `AGENTS.md` now: one short message, defaults suggested. Write the answers to `docs/project.md` as decisions and remove the marker.
    - Follow the brief's install steps (for Node templates usually `npm install`, sometimes a one-time browser install for the checks).
@@ -48,4 +48,4 @@ From then on, follow the `codeplate:workflow` skill for every change.
 
 ## Where the catalog comes from
 
-The script reads `catalog.json` from `https://codeplate.io` by default. `CODEPLATE_BASE_URL` (or `--base-url`) points it somewhere else, such as a local preview of the site; it is not a secret. If the catalog can't be reached, say so plainly and suggest trying again later; don't guess template ids or download URLs.
+The script reads `catalog.json` from `https://codeplate.io` by default. `CODEPLATE_BASE_URL` (or `--base-url`) points it somewhere else, such as a local preview of the site; it is not a secret. If the catalog can't be reached, say so plainly and suggest trying again later; don't guess template ids or itch.io pages.

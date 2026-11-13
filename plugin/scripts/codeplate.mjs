@@ -1,34 +1,34 @@
 #!/usr/bin/env node
-// CodePlate for coding agents: browse the catalog, fetch a template, check a project.
+// CodePlate for coding agents: browse the catalog, install a template the user downloaded, check a project.
 // Node 18+ built-ins only, so it runs the same on Windows, macOS and Linux.
 //
 //   node codeplate.mjs list [words...] [--tier free|pro] [--kind game|app|document] [--stack godot] [--json]
 //   node codeplate.mjs show <id> [--json]
-//   node codeplate.mjs get <id>          [--dir <parent>] [--name <folder>]   free templates
-//   node codeplate.mjs get --url <link>  [--dir <parent>] [--name <folder>]   a free zip link from codeplate.io
-//   node codeplate.mjs get --zip <file>  [--dir <parent>] [--name <folder>]   a zip the user downloaded (a Pro one from itch.io)
+//   node codeplate.mjs get <id>                                               where to download it (exit 3)
+//   node codeplate.mjs get --zip <file>  [--dir <parent>] [--name <folder>]   the template.zip the user downloaded from itch.io
 //   node codeplate.mjs status [dir] [--json]
 //   node codeplate.mjs check  [dir]
 //
 // Every command takes --base-url <url> (else $CODEPLATE_BASE_URL, else https://codeplate.io).
-// Exit codes: 0 ok, 1 failed, 2 usage, 3 needs the user (a Pro template to buy on itch.io, a missing tool).
-import { createHash } from 'node:crypto';
+// Exit codes: 0 ok, 1 failed, 2 usage, 3 needs the user (a template to download from itch.io, a missing tool).
+// Nothing downloads from codeplate.io (since 2026-11-12): every template, Free and Pro, comes from its
+// itch.io page, and only the user can download it there.
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { baseUrl, filterTemplates, findTemplate, get, loadCatalog, siteUrl, stackLabel, suggest, SiteError } from './lib/site.mjs';
+import { baseUrl, filterTemplates, findTemplate, loadCatalog, siteUrl, stackLabel, suggest, SiteError } from './lib/site.mjs';
 import { extractTemplateZip, ZipError } from './lib/unzip.mjs';
 import { describeProject, findProjectRoot, readManifest, requirements, runChecks, FREE_CREDIT } from './lib/project.mjs';
 
 const USAGE = `usage: codeplate <command> [options]
   list [words...] [--tier free|pro] [--kind game|app|document] [--stack <name>] [--json]
   show <id> [--json]
-  get <id> | --url <link> | --zip <file>  [--dir <parent>] [--name <folder>]
+  get <id> | --zip <file> [--dir <parent>] [--name <folder>]
   status [dir] [--json]
   check [dir]
 options: --base-url <url> (default: $CODEPLATE_BASE_URL or https://codeplate.io)`;
 
-const FLAGS_WITH_VALUE = new Set(['--tier', '--kind', '--stack', '--dir', '--name', '--url', '--zip', '--base-url']);
+const FLAGS_WITH_VALUE = new Set(['--tier', '--kind', '--stack', '--dir', '--name', '--zip', '--base-url']);
 const BOOL_FLAGS = new Set(['--json', '--help']);
 
 export function parseArgs(argv) {
@@ -73,7 +73,7 @@ async function cmdList({ args, opts }, io, base) {
   }
   for (const t of list) printTemplateLine(t, io.out);
   const pro = list.filter((t) => t.tier === 'pro').length;
-  io.out.write(`\n${list.length} template${list.length === 1 ? '' : 's'} (${list.length - pro} free, ${pro} Pro). Free templates download with no account and need the credit "${FREE_CREDIT}". Pro ones are sold on itch.io: the user buys and downloads them there ("show <id>" gives the page).\n`);
+  io.out.write(`\n${list.length} template${list.length === 1 ? '' : 's'} (${list.length - pro} free, ${pro} Pro). Every template downloads from its itch.io page, and only the user can download it ("show <id>" gives the page). Free ones cost nothing, need no account and need the credit "${FREE_CREDIT}". Pro ones are bought there first.\n`);
   return 0;
 }
 
@@ -103,11 +103,10 @@ async function cmdShow({ args, opts }, io, base) {
     `Stack:    ${stackLabel(t.stack)}`,
     `Tags:     ${(t.tags ?? []).join(', ')}`,
     `Checks:   ${t.checks}`,
-    `Size:     ${t.bytes ? `${Math.round(t.bytes / 1024)} KB zip` : 'unknown'}`,
     `Page:     ${siteUrl(base, t.page).href}`,
     ...(t.demo ? [`Demo:     ${siteUrl(base, t.demo).href}`] : []),
     ...(t.itch ? [`itch.io:  ${t.itch}`] : []),
-    `Get it:   ${t.tier === 'pro' ? 'Pro: the user buys it on its itch.io page (see "get")' : `codeplate get ${t.id}`}`,
+    `Get it:   the user downloads template.zip from its itch.io page${t.tier === 'pro' ? ' after buying it' : ' (free)'}; then codeplate get --zip <file>`,
   ];
   io.out.write(lines.join('\n') + '\n');
   return 0;
@@ -146,19 +145,24 @@ function installZip(bytes, { dest, expectId }, io) {
   return 0;
 }
 
-function proGuidance(t, base) {
-  const shop = t.itch ?? siteUrl(base, t.page).href;
+/** What the agent tells the user: download template.zip from the template's itch.io page, then hand it over. */
+export function downloadGuidance(t, base) {
+  const page = t.itch ?? siteUrl(base, t.page).href;
+  const pro = t.tier === 'pro';
   return [
-    `${t.name} is a Pro template, sold on itch.io${t.price ? ` (${t.price})` : ''}. You can't buy or download it yourself, and never ask the user for a password or card details. Ask them to:`,
-    `  1. Buy it on its itch.io page, ${shop}, and download template.zip.`,
+    pro
+      ? `${t.name} is a Pro template, sold on itch.io${t.price ? ` (${t.price})` : ''}. You can't buy or download it yourself, and never ask the user for a password or card details. Ask them to:`
+      : `${t.name} is a free template. It downloads from itch.io ($0, no account needed), and you can't download it yourself. Ask the user to:`,
+    `  1. ${pro ? 'Buy it on its itch.io page' : 'Open its itch.io page'}, ${page}, and download template.zip${pro ? '' : ' (choose "No thanks, just take me to the downloads" to skip the donation)'}.`,
     '  2. Tell you where the zip was saved. Then run:  codeplate get --zip "<path to the zip>"',
     '     (If they already unzipped it, work in that folder: codeplate status "<folder>")',
+    ...(pro ? [] : [`It comes under the CodePlate Free License: what they ship must show "${FREE_CREDIT}".`]),
   ].join('\n');
 }
 
 async function cmdGet({ args, opts }, io, base) {
   const cwd = io.cwd;
-  if ([args[0], opts.url, opts.zip].filter(Boolean).length !== 1) throw new UsageError('get takes one of: <id>, --url <link>, --zip <file>');
+  if ([args[0], opts.zip].filter(Boolean).length !== 1) throw new UsageError('get takes one of: <id> (where to download it), --zip <file> (install the downloaded template.zip)');
 
   if (opts.zip) {
     const file = resolve(cwd, opts.zip);
@@ -168,43 +172,8 @@ async function cmdGet({ args, opts }, io, base) {
     return installZip(bytes, { dest: destination(opts, id, cwd) }, io);
   }
 
-  if (opts.url) {
-    let link;
-    try {
-      link = new URL(opts.url.trim());
-    } catch {
-      throw new UsageError('--url must be a full https:// link');
-    }
-    if (base.protocol !== 'file:' && link.origin !== base.origin) throw new UsageError(`only links from ${base.origin} are accepted (got ${link.origin})`);
-    const free = link.pathname.match(/^\/t\/([a-z0-9-]+)\/(\d+\.\d+\.\d+|latest)\.zip$/);
-    if (!free) throw new UsageError('that isn\'t a CodePlate download link (expected /t/<id>/<version>.zip). A Pro template comes from itch.io: ask the user for the downloaded zip and use --zip');
-    const id = free[1];
-    const dest = destination(opts, id, cwd);
-    io.err.write(`Downloading ${link.href}\n`);
-    const res = await get(base.protocol === 'file:' ? siteUrl(base, link.href) : link, { ...io, accept: 'application/zip' });
-    if (res.status !== 200 || !/zip|octet-stream/.test(res.type)) {
-      throw new SiteError(`download failed (${res.status}, ${res.type || 'no type'})`, { status: res.status, code: 'download' });
-    }
-    // Public zips are byte-identical to the catalog's: check the hash when the catalog is reachable.
-    const t = await loadCatalog(base, io).then((c) => findTemplate(c, id)).catch(() => null);
-    if (t?.sha256 && (free[2] === 'latest' || free[2] === t.version)) verifyHash(res.bytes, t.sha256);
-    return installZip(res.bytes, { dest, expectId: id }, io);
-  }
-
   const { t } = await needTemplate(args[0], io, base);
-  if (t.tier === 'pro') throw new NeedsUser(proGuidance(t, base));
-  const dest = destination(opts, t.id, cwd);
-  const url = siteUrl(base, t.download);
-  io.err.write(`Downloading ${url.href}\n`);
-  const res = await get(url, { ...io, accept: 'application/zip' });
-  if (res.status !== 200) throw new SiteError(`download failed: ${url.href} answered ${res.status}`, { status: res.status, code: 'download' });
-  if (t.sha256) verifyHash(res.bytes, t.sha256);
-  return installZip(res.bytes, { dest, expectId: t.id }, io);
-}
-
-function verifyHash(bytes, expected) {
-  const got = createHash('sha256').update(bytes).digest('hex');
-  if (got !== expected) throw new ZipError(`SHA-256 mismatch: expected ${expected}, got ${got}. Not installing it.`);
+  throw new NeedsUser(downloadGuidance(t, base));
 }
 
 function guessId(bytes) {
